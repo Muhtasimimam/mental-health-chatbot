@@ -1,24 +1,23 @@
 from flask import Flask, request, jsonify
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
-import torch
+import torch, os
 
-# Load the trained model
-tokenizer = GPT2Tokenizer.from_pretrained("fine_tuned_chatbot")
-model = GPT2LMHeadModel.from_pretrained("fine_tuned_chatbot").to("cpu")  # Use CPU on Heroku
+# Load model & tokenizer from Hugging Face Hub
+REPO_ID   = "muhtasimimam/mh-chatbot"
+tokenizer = GPT2Tokenizer.from_pretrained(REPO_ID, token=os.environ.get("HF_TOKEN"))
+model     = GPT2LMHeadModel.from_pretrained(REPO_ID,    token=os.environ.get("HF_TOKEN")).to("cpu")
 
-# Initialize Flask app
 app = Flask(__name__)
 
-@app.route('/chat', methods=['POST'])
+@app.route("/chat", methods=["POST"])
 def chat():
-    data = request.get_json()
-    user_input = data.get("message", "")
-
-    inputs = tokenizer.encode(user_input, return_tensors="pt")
+    data = request.get_json(force=True)
+    text = data.get("message", "")
+    inputs  = tokenizer.encode(text, return_tensors="pt")
     outputs = model.generate(inputs, max_length=50, no_repeat_ngram_size=2)
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    reply   = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return jsonify({"response": reply})
 
-    return jsonify({"response": response})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
